@@ -190,6 +190,25 @@ func TestLastEventIDUpdatesAfterCaptures(t *testing.T) {
 	assertEqual(t, eventID, hub.LastEventID())
 }
 
+func TestConcurrentCapture(t *testing.T) {
+	// Test for the race detector, to verify that the global hub is safe for
+	// concurrent use.
+
+	// Need to call Init before using the static API, otherwise the global hub
+	// has no client and thus ignores events.
+	Init(ClientOptions{})
+
+	var wg sync.WaitGroup
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			CaptureMessage(fmt.Sprintf("test %d", i))
+		}(i)
+	}
+	wg.Wait()
+}
+
 func TestLayerAccessingEmptyStack(t *testing.T) {
 	hub := &Hub{}
 	if hub.stackTop() != nil {
