@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -291,6 +292,26 @@ func TestCaptureEventShouldSendEventWithProvidedError(t *testing.T) {
 	event := NewEvent()
 	event.Message = "event message"
 	client.CaptureEvent(event, nil, scope)
+	assertEqual(t, transport.lastEvent.Message, "event message")
+}
+
+func TestCaptureEventShouldIncludeGlobalTags(t *testing.T) {
+	os.Setenv("SENTRY_TAGS_sampletag", "samplevalue")
+	defer os.Unsetenv("SENTRY_TAGS_SAMPLETAG")
+	client, scope, transport := setupClientTest()
+	event := NewEvent()
+	event.Message = "event message"
+	client.AddEventProcessor(func(evt *Event, hint *EventHint) *Event {
+		if evt.Tags == nil {
+			evt.Tags = make(map[string]string)
+		}
+		for k, v := range client.options.Tags {
+			evt.Tags[k] = v
+		}
+		return evt
+	})
+	client.CaptureEvent(event, nil, scope)
+	assertEqual(t, "samplevalue", transport.lastEvent.Tags["sampletag"])
 	assertEqual(t, transport.lastEvent.Message, "event message")
 }
 

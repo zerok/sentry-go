@@ -148,6 +148,8 @@ type ClientOptions struct {
 	Dist string
 	// The environment to be sent with events.
 	Environment string
+	// Tags to be sent with events.
+	Tags map[string]string
 	// Maximum number of breadcrumbs.
 	MaxBreadcrumbs int
 	// An optional pointer to http.Client that will be used with a default
@@ -212,6 +214,7 @@ func NewClient(options ClientOptions) (*Client, error) {
 	if options.Environment == "" {
 		options.Environment = os.Getenv("SENTRY_ENVIRONMENT")
 	}
+	options.Tags = loadTags(options, os.Environ())
 
 	// SENTRYGODEBUG is a comma-separated list of key=value pairs (similar
 	// to GODEBUG). It is not a supported feature: recognized debug options
@@ -254,6 +257,23 @@ func NewClient(options ClientOptions) (*Client, error) {
 	client.setupIntegrations()
 
 	return &client, nil
+}
+
+func loadTags(opts ClientOptions, env []string) map[string]string {
+	if opts.Tags != nil && len(opts.Tags) > 0 {
+		return opts.Tags
+	}
+	tags := make(map[string]string)
+	for _, e := range env {
+		name := strings.Split(e, "=")[0]
+		if !strings.HasPrefix(name, "SENTRY_TAGS_") {
+			continue
+		}
+		tag := strings.TrimPrefix(name, "SENTRY_TAGS_")
+		tag = strings.ToLower(tag)
+		tags[tag] = os.Getenv(name)
+	}
+	return tags
 }
 
 func (client *Client) setupTransport() {
